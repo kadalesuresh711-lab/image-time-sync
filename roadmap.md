@@ -78,3 +78,16 @@
 - [x] Script reading hang fixed: the writing model's hidden "thinking" was
       consuming the whole answer budget, returning an empty reply that the app
       retried forever. Thinking is now switched off (reasoning_effort: none).
+
+## Cloned into this project (2026-09-10, ignite-flow-restored)
+- [x] Repo cloned and running here; 4 Pixazo keys + Agnes AI key stored as secrets (never in code)
+- [x] All 4 picture keys verified 200 (image URL returned); writing key verified 200 on agnes-2.5-flash
+- [x] TIMESTAMP MISMATCH FIXED: when the writing model restarted its answer at
+      "1)" instead of using the script's own line numbers, any of those numbers
+      that happened to fall inside the requested range (e.g. "30)" in a request
+      for lines 30-89) was accepted as that line — so the panel drew a scene
+      from ~29 lines later. The numbering style is now decided once per answer:
+      global numbering is trusted only when EVERY number lies inside the
+      requested range; a restarted answer is mapped positionally only when it is
+      a clean 1..N run of exactly the requested size, otherwise it is discarded
+      and the lines are asked for again.
