@@ -463,6 +463,7 @@ export async function writePrompts(
     // from the whole answer, and never mix the two.
     const lowest = entries.reduce((m, e) => Math.min(m, e.n), entries[0]!.n);
     const highest = entries.reduce((m, e) => Math.max(m, e.n), entries[0]!.n);
+    const ascending = entries.every((e, i) => i === 0 || e.n > entries[i - 1]!.n);
     const looksGlobal = lowest >= first && highest <= last;
 
     if (looksGlobal) {
@@ -471,22 +472,38 @@ export async function writePrompts(
       return;
     }
 
-    // Renumbered (or partly out of range). Positional mapping is only safe when
-    // the answer is a clean 1..N run of EXACTLY the requested size — anything
-    // else is guesswork and would put a prompt on the wrong timestamp.
-    const cleanRun =
-      lowest === 1 &&
-      highest === entries.length &&
-      entries.length === want.length &&
-      entries.every((e, i) => e.n === i + 1);
-    if (!cleanRun) {
+    // Renumbered: the answer restarts at 1. Map by the answer's own number
+    // (1 -> want[0], 2 -> want[1], ...) — safe even when the answer is
+    // truncated or skips a number, because each prompt still carries its own
+    // position in the requested list.
+    if (ascending && lowest === 1 && highest <= want.length) {
+      for (const e of entries) accept(want[e.n - 1] as number, e.text);
+      return;
+    }
+
+    // Unnumbered / oddly numbered but exactly the right amount, in order:
+    // positional mapping is unambiguous.
+    if (ascending && entries.length === want.length) {
+      entries.forEach((e, i) => accept(want[i] as number, e.text));
+      return;
+    }
+
+    // Anything else: keep only the numbers that clearly belong to this request
+    // instead of throwing the whole answer away (which stalled long runs).
+    let kept = 0;
+    for (const e of entries) {
+      if (wantSet.has(e.n)) {
+        accept(e.n, e.text);
+        kept++;
+      }
+    }
+    if (kept === 0) {
       console.error(
         `writePrompts: answer numbering does not match request ` +
           `(${entries.length} prompts numbered ${lowest}-${highest} for lines ${first}-${last}) — discarded`,
       );
-      return;
     }
-    entries.forEach((e, i) => accept(want[i] as number, e.text));
+
   };
 
   // ONE request for the whole range.
