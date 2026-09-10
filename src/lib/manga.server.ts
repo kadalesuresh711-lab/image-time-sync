@@ -448,19 +448,41 @@ export async function writePrompts(
     };
 
     const wantSet = new Set(want);
-    const matched = entries.filter((e) => wantSet.has(e.n));
-    if (matched.length > 0) {
-      // Numbers that belong to this request: trust them.
-      for (const e of matched) accept(e.n, e.text);
+    const first = want[0] as number;
+    const last = want[want.length - 1] as number;
+
+    // TIMESTAMP ALIGNMENT (this is what used to shift panels onto the wrong
+    // moment). Two numbering styles come back:
+    //   global    — the answer uses this script's own line numbers
+    //   renumbered— the answer restarts at 1) regardless of what was asked
+    // The old code trusted ANY number that happened to fall inside the
+    // requested range. When a range started low enough (say lines 30-89) a
+    // renumbered answer's "30)" — really the 30th prompt of the range, i.e.
+    // script line 59 — was accepted as line 30, so every panel in that range
+    // drew a scene from ~29 lines later in the script. Decide the style ONCE,
+    // from the whole answer, and never mix the two.
+    const lowest = entries.reduce((m, e) => Math.min(m, e.n), entries[0]!.n);
+    const highest = entries.reduce((m, e) => Math.max(m, e.n), entries[0]!.n);
+    const looksGlobal = lowest >= first && highest <= last;
+
+    if (looksGlobal) {
+      // Every number in the answer belongs to this request: trust them.
+      for (const e of entries) if (wantSet.has(e.n)) accept(e.n, e.text);
       return;
     }
 
-    // No requested number came back. The model renumbered its answer (1..N).
-    // Positional mapping is only safe when the count matches EXACTLY — anything
+    // Renumbered (or partly out of range). Positional mapping is only safe when
+    // the answer is a clean 1..N run of EXACTLY the requested size — anything
     // else is guesswork and would put a prompt on the wrong timestamp.
-    if (entries.length !== want.length) {
+    const cleanRun =
+      lowest === 1 &&
+      highest === entries.length &&
+      entries.length === want.length &&
+      entries.every((e, i) => e.n === i + 1);
+    if (!cleanRun) {
       console.error(
-        `writePrompts: answer numbering does not match request (${entries.length} prompts for ${want.length} lines) — discarded`,
+        `writePrompts: answer numbering does not match request ` +
+          `(${entries.length} prompts numbered ${lowest}-${highest} for lines ${first}-${last}) — discarded`,
       );
       return;
     }
