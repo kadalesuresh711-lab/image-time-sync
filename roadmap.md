@@ -91,3 +91,6 @@
       requested range; a restarted answer is mapped positionally only when it is
       a clean 1..N run of exactly the requested size, otherwise it is discarded
       and the lines are asked for again.
+- [ ] Reproduce the 180/426 browser stall with the uploaded 426-timestamp script
+- [ ] Identify and fix the proven prompt-stall cause without changing timestamp mapping
+- [ ] Complete a full browser run through 426/426 prompts and panels
